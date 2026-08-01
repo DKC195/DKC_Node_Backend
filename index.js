@@ -40,6 +40,11 @@ app.use(cors({
 app.use(cookieParser());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
+// Lightweight endpoint used by the frontend to wake and verify the API.
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Define your routes here
 app.use('/api/auth', userRoutes);
 app.use('/api/products', productRoutes);

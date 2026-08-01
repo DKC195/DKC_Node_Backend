@@ -5,7 +5,13 @@
 function toPublicImageUrl(url) {
     if (!url || typeof url !== 'string') return url;
     const apiBase = (process.env.API_URL || 'http://localhost:8080').replace(/\/$/, '');
-    return url.replace(/^https?:\/\/[^/]+/, apiBase);
+
+    // Supabase and other externally hosted images already have a valid public
+    // URL. Only rewrite legacy local upload URLs saved before API_URL existed.
+    const localUploadOrigin = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?=\/uploads(?:\/|$))/i;
+    return localUploadOrigin.test(url)
+        ? url.replace(localUploadOrigin, apiBase)
+        : url;
 }
 
 /** Extracts filename from image URL (handles both localhost and API_URL formats). */

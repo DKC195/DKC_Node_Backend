@@ -58,7 +58,7 @@ Thumbs.db
 
 # Uploads / storage
 
-uploads/
+# uploads/
 public/uploads/
 
 # Temp files

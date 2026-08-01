@@ -2,6 +2,7 @@ const blogModel = require('../models/blogModel');
 const path = require('path');
 const fs = require('fs');
 const { transformImageUrl, transformImageUrls, getImageFilename } = require('../utils/imageUrl');
+const { uploadImageToSupabase, deleteImageFromStorage } = require('../utils/supabaseStorage');
 
 const baseUrl = (process.env.API_URL || 'http://localhost:8080') + '/uploads/'
 const uploadDir = path.join(__dirname, '../uploads');
@@ -11,7 +12,7 @@ exports.createBlog = async (req, res) => {
     try {
         const { title, content, category, excerpt, readTime } = req.body;
 
-        const image = req.file ? baseUrl + req.file.filename : null;
+        const image = req.file ? (await uploadImageToSupabase(req.file, 'blogs')) || (baseUrl + req.file.filename) : null;
 
         const newBlog = await blogModel.create({
             title,
@@ -61,15 +62,10 @@ exports.updateBlog = async (req, res) => {
         // ✅ If new image uploaded
         if (req.file) {
             if (blog.image) {
-                const oldImage = getImageFilename(blog.image);
-                const oldPath = path.join(uploadDir, oldImage);
-
-                if (fs.existsSync(oldPath)) {
-                    fs.unlinkSync(oldPath);
-                }
+                await deleteImageFromStorage(blog.image);
             }
 
-            blog.image = baseUrl + req.file.filename;
+            blog.image = (await uploadImageToSupabase(req.file, 'blogs')) || (baseUrl + req.file.filename);
         }
 
         blog.title = title;
@@ -94,12 +90,7 @@ exports.deleteBlog = async (req, res) => {
 
         // ✅ Delete image from server
         if (blog.image) {
-            const imageName = getImageFilename(blog.image);
-            const imagePath = path.join(uploadDir, imageName);
-
-            if (fs.existsSync(imagePath)) {
-                fs.unlinkSync(imagePath);
-            }
+            await deleteImageFromStorage(blog.image);
         }
 
         await blog.deleteOne();

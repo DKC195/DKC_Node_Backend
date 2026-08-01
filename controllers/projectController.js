@@ -2,6 +2,7 @@ const projectModel = require("../models/projectModel");
 const fs = require("fs");
 const path = require("path");
 const { transformImageUrl, transformImageUrls, getImageFilename } = require('../utils/imageUrl');
+const { uploadImageToSupabase, deleteImageFromStorage } = require('../utils/supabaseStorage');
 
 const baseUrl = (process.env.API_URL || 'http://localhost:8080') + '/uploads/'
 const uploadDir = path.join(__dirname, "../uploads");
@@ -15,12 +16,14 @@ exports.createProject = async (req, res) => {
             return res.status(400).json({ message: "Project image is required" });
         }
 
+        const imageUrl = await uploadImageToSupabase(req.file, 'projects');
+
         const project = await projectModel.create({
             title,
             description,
             longDescription,
             category,
-            image: baseUrl + req.file.filename,
+            image: imageUrl || (baseUrl + req.file.filename),
         });
 
         res.status(201).json(project);
@@ -66,15 +69,10 @@ exports.updateProject = async (req, res) => {
         // ✅ If new image uploaded → delete old one
         if (req.file) {
             if (project.image) {
-                const oldImage = getImageFilename(project.image);
-                const oldPath = path.join(uploadDir, oldImage);
-
-                if (fs.existsSync(oldPath)) {
-                    fs.unlinkSync(oldPath);
-                }
+                await deleteImageFromStorage(project.image);
             }
 
-            project.image = baseUrl + req.file.filename;
+            project.image = (await uploadImageToSupabase(req.file, 'projects')) || (baseUrl + req.file.filename);
         }
 
         project.title = title;
@@ -100,12 +98,7 @@ exports.deleteProject = async (req, res) => {
 
         // ✅ Delete image from server
         if (project.image) {
-            const imageName = getImageFilename(project.image);
-            const imagePath = path.join(uploadDir, imageName);
-
-            if (fs.existsSync(imagePath)) {
-                fs.unlinkSync(imagePath);
-            }
+            await deleteImageFromStorage(project.image);
         }
 
         await project.deleteOne();

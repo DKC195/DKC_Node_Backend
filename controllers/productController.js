@@ -2,6 +2,7 @@ const productModel = require('../models/productModel');
 const fs = require("fs");
 const path = require("path");
 const { transformImageUrl, transformImageUrls, getImageFilename } = require('../utils/imageUrl');
+const { uploadImageToSupabase, deleteImageFromStorage } = require('../utils/supabaseStorage');
 
 const baseUrl = (process.env.API_URL || 'http://localhost:8080') + '/uploads/'
 
@@ -23,13 +24,15 @@ exports.createProduct = async (req, res) => {
             return res.status(400).json({ message: "Product image is required" });
         }
 
+        const imageUrl = await uploadImageToSupabase(req.file, 'products');
+
         const product = await productModel.create({
             title,
             description,
             shortDescription,
             longDescription,
             bestFor,
-            image: baseUrl + req.file.filename,
+            image: imageUrl || (baseUrl + req.file.filename),
             provide: JSON.parse(req.body.provide || "[]"),
             advantages: JSON.parse(req.body.advantages || "[]"),
             secondaryLink,
@@ -100,15 +103,12 @@ exports.updateProduct = async (req, res) => {
 
         // ✅ If new image uploaded
         if (req.file) {
-            // Delete old image
-            const oldImage = getImageFilename(product.image);
-            const oldPath = path.join(__dirname, "../uploads", oldImage);
-            if (fs.existsSync(oldPath)) {
-                fs.unlinkSync(oldPath);
+            if (product.image) {
+                await deleteImageFromStorage(product.image);
             }
 
-            // Save new image path
-            product.image = `${baseUrl + req.file.filename}`;
+            const imageUrl = await uploadImageToSupabase(req.file, 'products');
+            product.image = imageUrl || `${baseUrl + req.file.filename}`;
         }
 
         await product.save();
@@ -129,12 +129,7 @@ exports.deleteProduct = async (req, res) => {
 
         // ✅ Delete image from server
         if (product.image) {
-            const imageName = getImageFilename(product.image);
-            const imagePath = path.join(__dirname, "../uploads", imageName);
-
-            if (fs.existsSync(imagePath)) {
-                fs.unlinkSync(imagePath);
-            }
+            await deleteImageFromStorage(product.image);
         }
 
         // ✅ Delete product from DB
